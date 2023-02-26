@@ -583,6 +583,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         pc++;
         continue;
       }
+      case OP_TAILCALL:
       case OP_CALL: {
         int b = GETARG_B(i);
         int nresults = GETARG_C(i) - 1;
@@ -596,38 +597,6 @@ void luaV_execute (lua_State *L, int nexeccalls) {
           case PCRC: {
             /* it was a C function (`precall' called it); adjust results */
             if (nresults >= 0) L->top = L->ci->top;
-            base = L->base;
-            continue;
-          }
-          default: {
-            return;  /* yield */
-          }
-        }
-      }
-      case OP_TAILCALL: {
-        int b = GETARG_B(i);
-        if (b != 0) L->top = ra+b;  /* else previous instruction set top */
-        L->savedpc = pc;
-        lua_assert(GETARG_C(i) - 1 == LUA_MULTRET);
-        switch (luaD_precall(L, ra, LUA_MULTRET)) {
-          case PCRLUA: {
-            /* tail call: put new frame in place of previous one */
-            CallInfo *ci = L->ci - 1;  /* previous frame */
-            int aux;
-            StkId func = ci->func;
-            StkId pfunc = (ci+1)->func;  /* previous function index */
-            if (L->openupval) luaF_close(L, ci->base);
-            L->base = ci->base = ci->func + ((ci+1)->base - pfunc);
-            for (aux = 0; pfunc+aux < L->top; aux++)  /* move frame down */
-              setobjs2s(L, func+aux, pfunc+aux);
-            ci->top = L->top = func+aux;  /* correct top */
-            lua_assert(L->top == L->base + clvalue(func)->l.p->maxstacksize);
-            ci->savedpc = L->savedpc;
-            ci->tailcalls++;  /* one more call lost */
-            L->ci--;  /* remove new frame */
-            goto reentry;
-          }
-          case PCRC: {  /* it was a C function (`precall' called it) */
             base = L->base;
             continue;
           }
